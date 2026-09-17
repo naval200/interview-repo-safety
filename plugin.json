@@ -1,0 +1,18 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "interview-repo-safety",
+  "version": "1.0.0",
+  "description": "Pre-install security gate for software-engineering interview and take-home repositories.",
+  "author": {
+    "name": "naval200"
+  },
+  "homepage": "https://github.com/naval200/interview-repo-safety",
+  "repository": "https://github.com/naval200/interview-repo-safety",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "interview",
+    "take-home",
+    "supply-chain"
+  ]
+}

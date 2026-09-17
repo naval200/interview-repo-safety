@@ -101,8 +101,10 @@ Findings appear only under **Opsera Findings** when tools actually return data.
 
 ## Layout
 
+Canonical path in this plugin repo:
+
 ```text
-.cursor/skills/interview-repo-safety/
+skills/interview-repo-safety/
   SKILL.md
   README.md
   reference/
@@ -115,8 +117,7 @@ Findings appear only under **Opsera Findings** when tools actually return data.
   scripts/          # optional readonly helpers (stdlib only)
 ```
 
-Portable copies may later live under `~/.cursor/skills/`, `.agents/skills/`, or `.claude/skills/`.
-
+For local Cursor development, `.cursor/skills/interview-repo-safety` symlinks here. Personal installs may live under `~/.cursor/skills/`, `~/.claude/skills/`, or `~/.agents/skills/`.
 ## Limitations
 
 - Does not execute the target; install-time and runtime behavior are **not verified** in Phase 1
