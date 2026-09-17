@@ -18,7 +18,7 @@ Two phases only. **Never** auto-advance Phase 1 → Phase 2.
 | Phase | Name | When |
 |---|---|---|
 | 1 | Static pre-install security audit | Always on invocation |
-| 2 | Optional sandboxed execution | Only if user explicitly requests **and** verdict is SAFE or REVIEW |
+| 2 | Optional sandboxed execution | Only if user explicitly requests **and** verdict is SAFE or REVIEW. BLOCK may use the same jail only with an explicit **observe** request. |
 
 Do **not** use or depend on `https://github.com/Swap03pathi/interview-assignment-scanner`. Detection rules live in this skill.
 
@@ -29,13 +29,17 @@ Read before acting:
 - [reference/policy.md](reference/policy.md)
 - [reference/report-template.md](reference/report-template.md)
 - [reference/capability-matrix.md](reference/capability-matrix.md)
-- [reference/sandbox.md](reference/sandbox.md) (Phase 2 only)
+- [reference/sandbox.md](reference/sandbox.md) (Phase 2 only — Docker runner, not host terminal)
 
 Optional readonly helpers (stdlib only; never `npm install` the target):
 
 - `scripts/inventory-node.mjs <repo>`
 - `scripts/scan-surfaces.sh <repo>`
 - `scripts/hash-hooks.sh <repo>`
+
+Phase 2 runner (Docker; never a substitute for Phase 1):
+
+- `sandbox/reposafety-run --repo <target> -- <command...>`
 
 Canonical script sources: [reference/helper-scripts.md](reference/helper-scripts.md). If on-disk scripts drift, regenerate from that file. If scripts are missing, perform the same inspections with Read / Grep / read-only Git. Policy docs remain authoritative (e.g. do not treat `@vitejs` / `@types` as private scopes).
 
@@ -204,19 +208,33 @@ Antfarm-style chain must be caught **before** install: obscure/legit-looking ani
 
 Emit the full template in `reference/report-template.md`. Then **STOP**.
 
-Offer Phase 2 only if the user asks and verdict is SAFE or REVIEW. Otherwise refuse install/run.
+Offer Phase 2 only if the user asks and verdict is SAFE or REVIEW. Otherwise refuse install/run (observe-in-jail only if they explicitly say observe).
 
 ---
 
 ## Phase 2 — Optional sandboxed execution
 
-Follow `reference/sandbox.md`:
+Follow [reference/sandbox.md](reference/sandbox.md). **Do not install or run the target on the host.**
 
-- Explicit user request required
-- Prefer restricted terminal (deny network by default, workspace FS only, no sudo/SSH agent/home secrets)
-- npm allowlist starts at `registry.npmjs.org`; other domain → STOP
-- Stop conditions → `DO NOT CONTINUE`
-- Unrestricted needs → `DISPOSABLE VM REQUIRED` (never weaken sandbox)
+Use the Docker jail:
+
+```bash
+sandbox/reposafety-run --repo <target> -- npm install
+```
+
+| Rule | Action |
+|---|---|
+| Explicit user request | Required. Never auto-advance from Phase 1. |
+| Verdict SAFE or REVIEW | Allowed. |
+| Verdict DO NOT INSTALL / RUN | Refuse. Same jail only if they explicitly **observe**. |
+| Docker missing (exit 2) | Stop. Do not fall back to host install. |
+| Egress | Default-deny proxy. `registry.npmjs.org` only until the user names another host. |
+| `BLOCKED egress:` (exit 3) | `DO NOT CONTINUE`. Do not `--allow` unless the user names that host. |
+| Needs sudo / Docker socket / host home / open network | `DISPOSABLE VM REQUIRED`. Never weaken the jail. |
+
+The runner bind-mounts **only** the target at `/work`, drops caps, runs non-root, and logs every allowed CONNECT/HTTP plus blocked destinations. It does not MITM TLS.
+
+Canonical runner: [sandbox/reposafety-run](sandbox/reposafety-run). Policy: [reference/sandbox.md](reference/sandbox.md).
 
 ---
 
@@ -230,3 +248,5 @@ Follow `reference/sandbox.md`:
 - [ ] Were secrets printed? (must be no)
 - [ ] Were unsafe Git ops used? (must be no)
 - [ ] Were IDE auto-run tasks checked?
+- [ ] If Phase 2 ran: was it `sandbox/reposafety-run` (not host install)?
+- [ ] If Phase 2 ran: was the proxy log checked for `BLOCKED egress`?

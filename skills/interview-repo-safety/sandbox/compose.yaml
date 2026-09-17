@@ -1,0 +1,57 @@
+# Phase 2 jail. Paths and allowlist are injected by reposafety-run.
+# sandbox has no route to the internet except through proxy on the internal network.
+
+networks:
+  jail:
+    internal: true
+  egress:
+
+services:
+  proxy:
+    image: python:3.12-alpine
+    command: ["python", "-u", "/proxy/proxy.py"]
+    volumes:
+      - ${PROXY_PY}:/proxy/proxy.py:ro
+    environment:
+      ALLOW: ${ALLOW:-registry.npmjs.org}
+      LISTEN: 0.0.0.0:8888
+    networks:
+      jail:
+        aliases: [proxy]
+      egress:
+    restart: "no"
+
+  sandbox:
+    image: ${IMAGE:-node:22-bookworm-slim}
+    working_dir: /work
+    user: ${SANDBOX_USER:-1000:1000}
+    read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /home/user
+    volumes:
+      - ${REPO}:/work
+    environment:
+      HOME: /home/user
+      NPM_CONFIG_CACHE: /tmp/npm-cache
+      npm_config_cache: /tmp/npm-cache
+      HTTP_PROXY: http://proxy:8888
+      HTTPS_PROXY: http://proxy:8888
+      http_proxy: http://proxy:8888
+      https_proxy: http://proxy:8888
+      ALL_PROXY: http://proxy:8888
+      NO_PROXY: proxy
+      no_proxy: proxy
+      npm_config_proxy: http://proxy:8888
+      npm_config_https_proxy: http://proxy:8888
+      npm_config_fund: "false"
+      PIP_PROXY: http://proxy:8888
+    networks:
+      - jail
+    depends_on:
+      - proxy

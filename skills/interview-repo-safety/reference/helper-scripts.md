@@ -4,6 +4,8 @@ Plan mode may block creating executable files. If `scripts/*.sh` / `scripts/*.mj
 
 These helpers must **never** install packages or execute repository code.
 
+Phase 2 install/run is **not** these scripts. It is `sandbox/reposafety-run` (Docker). See [sandbox.md](sandbox.md).
+
 ---
 
 ## `scripts/hash-hooks.sh`

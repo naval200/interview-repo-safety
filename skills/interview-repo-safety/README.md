@@ -56,9 +56,17 @@ Covers:
 
 ### Phase 2 — Optional sandboxed execution (never automatic)
 
-Only if you **explicitly** request it and Phase 1 verdict is `SAFE TO INSTALL` or `REVIEW BEFORE INSTALLING`.
+Only if you **explicitly** request it and Phase 1 verdict is `SAFE TO INSTALL` or `REVIEW BEFORE INSTALLING`. A `DO NOT INSTALL / RUN` verdict refuses install/run; you may still **observe** in the same jail if you ask for that by name.
 
-Uses restricted terminal preferences: deny-by-default network, workspace-only FS, no sudo/SSH agent/home credential mounts. npm starts allowlisted to `registry.npmjs.org`. Unexpected domains → STOP. Dangerous behavior → `DO NOT CONTINUE`. Needs that break the sandbox → `DISPOSABLE VM REQUIRED` (sandbox is not weakened).
+Phase 2 does **not** run on the host. It uses the Docker runner:
+
+```bash
+sandbox/reposafety-run --repo . -- npm install
+```
+
+The jail bind-mounts only the target repo, drops capabilities, and sends all network through a default-deny proxy (`registry.npmjs.org` until you `--allow` another host). Blocked destinations are logged as `BLOCKED egress: host:port`. Docker Desktop (or equivalent) is required. Needs that break the jail → `DISPOSABLE VM REQUIRED` (the jail is not weakened).
+
+Details: [reference/sandbox.md](reference/sandbox.md).
 
 ## Verdict meanings
 
@@ -97,7 +105,7 @@ Findings appear only under **Opsera Findings** when tools actually return data.
 - Git hook / IDE auto-run / history-secret focus for take-homes
 - Network+dynamic-exec CRITICAL heuristic and IOC listing without fetching payloads
 - Categorical gate + confidence + structured report
-- Sandbox / VM escalation policy
+- Phase 2 Docker jail (`sandbox/reposafety-run`) with default-deny egress
 
 ## Layout
 
@@ -114,17 +122,19 @@ skills/interview-repo-safety/
     report-template.md
     static-checklist.md
     sandbox.md
-  scripts/          # optional readonly helpers (stdlib only)
+  scripts/          # optional readonly helpers (stdlib only; Phase 1)
+  sandbox/          # Phase 2 Docker runner (reposafety-run + proxy)
 ```
 
 For local Cursor development, `.cursor/skills/interview-repo-safety` symlinks here. Personal installs may live under `~/.cursor/skills/`, `~/.claude/skills/`, or `~/.agents/skills/`.
 ## Limitations
 
 - Does not execute the target; install-time and runtime behavior are **not verified** in Phase 1
+- Phase 2 requires Docker; it is a folder jail + allowlist proxy, not a malware sandbox that decrypts TLS
 - Transitive graphs may be incomplete without parseable lockfiles
 - Sonatype/Opsera/Socket results appear only when those tools are available and actually run
 - Heuristic relevance and typosquat checks can false-positive; obscure ≠ malicious
-- Does not replace a disposable VM for high-risk work
+- Does not replace a disposable VM for high-risk work (Docker-in-Docker, sudo, host credentials)
 
 ## Exact invoke command
 

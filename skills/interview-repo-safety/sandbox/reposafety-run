@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# Phase 2 runner: install/run the target only inside a Docker jail.
+# FS: repo bind-mounted at /work. No home, no docker.sock, no sudo.
+# Network: default-deny via an allowlist proxy. Unknown hosts → BLOCKED egress.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: reposafety-run [options] -- <command...>
+
+Run a command against an untrusted repository inside a Docker jail.
+The sandbox cannot reach the internet except through a default-deny
+proxy. Unknown destinations are logged as: BLOCKED egress: host:port
+
+Options:
+  --repo <path>     Repository root (default: current directory)
+  --allow <host>    Extra allowed hostname (repeatable).
+                    registry.npmjs.org is always allowed.
+  --image <image>   Sandbox image (default: node:22-bookworm-slim)
+  -h, --help        Show this help
+
+Exit codes:
+  0  command succeeded
+  1  command failed or usage error
+  2  Docker is missing or the daemon is not running
+  3  proxy logged BLOCKED egress
+
+Examples:
+  reposafety-run --repo ./take-home -- npm install
+  reposafety-run --allow pypi.org --allow files.pythonhosted.org \
+    --image python:3.12-bookworm-slim -- pip install -r requirements.txt
+EOF
+}
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="."
+IMAGE="node:22-bookworm-slim"
+ALLOW="registry.npmjs.org"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo)
+      [ $# -ge 2 ] || { echo "reposafety-run: --repo needs a path" >&2; exit 1; }
+      REPO=$2
+      shift 2
+      ;;
+    --allow)
+      [ $# -ge 2 ] || { echo "reposafety-run: --allow needs a hostname" >&2; exit 1; }
+      ALLOW="${ALLOW},$2"
+      shift 2
+      ;;
+    --image)
+      [ $# -ge 2 ] || { echo "reposafety-run: --image needs an image name" >&2; exit 1; }
+      IMAGE=$2
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "reposafety-run: unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ $# -eq 0 ]; then
+  echo "reposafety-run: missing command after --" >&2
+  usage >&2
+  exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "reposafety-run: Docker is required for Phase 2." >&2
+  echo "Install Docker Desktop, or use a disposable VM. Do not install the target on the host." >&2
+  exit 2
+fi
+if ! docker info >/dev/null 2>&1; then
+  echo "reposafety-run: Docker daemon is not running." >&2
+  exit 2
+fi
+
+DC="docker compose"
+if ! docker compose version >/dev/null 2>&1; then
+  if command -v docker-compose >/dev/null 2>&1; then
+    DC="docker-compose"
+  else
+    echo "reposafety-run: docker compose is required." >&2
+    exit 2
+  fi
+fi
+
+if [ ! -d "$REPO" ]; then
+  echo "reposafety-run: repo is not a directory: $REPO" >&2
+  exit 1
+fi
+REPO="$(cd "$REPO" && pwd)"
+
+# Deduplicate allow hosts (bash 3.2-safe).
+ALLOW_NORM=""
+OLDIFS=$IFS
+IFS=,
+for h in $ALLOW; do
+  h=$(printf '%s' "$h" | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:]]//g')
+  [ -n "$h" ] || continue
+  case ",$ALLOW_NORM," in
+    *",$h,"*) ;;
+    *) ALLOW_NORM="${ALLOW_NORM:+$ALLOW_NORM,}$h" ;;
+  esac
+done
+IFS=$OLDIFS
+ALLOW=$ALLOW_NORM
+
+PROJECT="rs$$"
+export PROXY_PY="$HERE/proxy.py"
+export ALLOW
+export IMAGE
+export REPO
+export SANDBOX_USER="$(id -u):$(id -g)"
+
+echo "reposafety-run: repo=$REPO image=$IMAGE allow=$ALLOW" >&2
+echo "reposafety-run: jail FS=/work only; egress default-deny via proxy" >&2
+
+cleanup() {
+  $DC -f "$HERE/compose.yaml" -p "$PROJECT" down --remove-orphans >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+echo "reposafety-run: pulling images if needed (python:3.12-alpine, $IMAGE)" >&2
+$DC -f "$HERE/compose.yaml" -p "$PROJECT" pull proxy sandbox >&2
+
+$DC -f "$HERE/compose.yaml" -p "$PROJECT" up -d proxy >&2
+i=0
+while [ "$i" -lt 40 ]; do
+  if $DC -f "$HERE/compose.yaml" -p "$PROJECT" logs proxy 2>/dev/null | grep -q 'proxy listen='; then
+    break
+  fi
+  i=$((i + 1))
+  sleep 0.25
+done
+if ! $DC -f "$HERE/compose.yaml" -p "$PROJECT" logs proxy 2>/dev/null | grep -q 'proxy listen='; then
+  echo "reposafety-run: proxy did not become ready" >&2
+  $DC -f "$HERE/compose.yaml" -p "$PROJECT" logs proxy >&2 || true
+  exit 2
+fi
+
+set +e
+$DC -f "$HERE/compose.yaml" -p "$PROJECT" run --rm --no-deps sandbox "$@"
+status=$?
+set -e
+
+proxy_logs="$($DC -f "$HERE/compose.yaml" -p "$PROJECT" logs --no-color proxy 2>/dev/null || true)"
+if [ -n "$proxy_logs" ]; then
+  echo "----- proxy log -----" >&2
+  printf '%s\n' "$proxy_logs" >&2
+  echo "----- end proxy log -----" >&2
+fi
+
+if printf '%s\n' "$proxy_logs" | grep -q '^BLOCKED egress:'; then
+  echo "reposafety-run: DO NOT CONTINUE — unexpected egress was blocked." >&2
+  echo "Whitelist a host only after you understand it: --allow <host>" >&2
+  if [ "$status" -eq 0 ]; then
+    exit 3
+  fi
+  exit 3
+fi
+
+exit "$status"

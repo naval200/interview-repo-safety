@@ -15,6 +15,6 @@ Do **not** depend on https://github.com/Swap03pathi/interview-assignment-scanner
 
 ## Boundary of this skill
 
-**Owns:** static-first ban list; unsafe Git ban; repo discovery; git hooks + SHA-256; orphaned objects; global hooksPath/templateDir; IDE/devcontainer auto-run; full dependency inventory (incl. devDeps); interview relevance classification; typosquat heuristics (prefer Sonatype); lifecycle + dynamic exec + network/C2/IOC collection; credential presence + history secrets; categorical verdict + confidence; report template; sandbox/VM policy.
+**Owns:** static-first ban list; unsafe Git ban; repo discovery; git hooks + SHA-256; orphaned objects; global hooksPath/templateDir; IDE/devcontainer auto-run; full dependency inventory (incl. devDeps); interview relevance classification; typosquat heuristics (prefer Sonatype); lifecycle + dynamic exec + network/C2/IOC collection; credential presence + history secrets; categorical verdict + confidence; report template; Phase 2 Docker runner (`sandbox/reposafety-run`) and default-deny egress proxy; VM escalation policy.
 
-**Does not own:** CVE databases, malware DBs, reputation engines, replacement typosquat engines, generic SAST rule packs.
+**Does not own:** CVE databases, malware DBs, reputation engines, replacement typosquat engines, generic SAST rule packs; kernel isolation beyond Docker; TLS interception of allowlisted downloads.

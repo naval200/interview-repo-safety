@@ -86,4 +86,6 @@ Then in Agent chat:
 /interview-repo-safety
 ```
 
+Do not `npm install` on the host. Phase 2 (only if you ask, and only after a non-blocking verdict) uses `sandbox/reposafety-run` (Docker jail, default-deny network).
+
 Skill details: [skills/interview-repo-safety/README.md](skills/interview-repo-safety/README.md)
