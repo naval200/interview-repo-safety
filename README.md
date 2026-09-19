@@ -89,3 +89,7 @@ Then in Agent chat:
 Do not `npm install` on the host. Phase 2 (only if you ask, and only after a non-blocking verdict) uses `sandbox/reposafety-run` (Docker jail, default-deny network).
 
 Skill details: [skills/interview-repo-safety/README.md](skills/interview-repo-safety/README.md)
+
+## How this skill was built
+
+Human guide (not loaded during an audit): [docs/from-prompt-to-skill.md](docs/from-prompt-to-skill.md). How a long prompt is split into `SKILL.md` + `reference/` + `scripts/`, and where to add a new malicious pattern.

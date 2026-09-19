@@ -127,6 +127,8 @@ skills/interview-repo-safety/
 ```
 
 For local Cursor development, `.cursor/skills/interview-repo-safety` symlinks here. Personal installs may live under `~/.cursor/skills/`, `~/.claude/skills/`, or `~/.agents/skills/`.
+
+How the original prompt was mapped onto this layout (human reading, not part of the audit): [docs/from-prompt-to-skill.md](../../docs/from-prompt-to-skill.md).
 ## Limitations
 
 - Does not execute the target; install-time and runtime behavior are **not verified** in Phase 1
